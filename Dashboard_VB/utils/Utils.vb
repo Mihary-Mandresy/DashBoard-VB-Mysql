@@ -42,7 +42,7 @@ Module Utils
         Public k_Acc as Boolean
         Public k_Brake as Boolean
         Public rapport as Integer
-        Public dejaInsert as Boolean
+        Public replayActivate as Boolean
     End Structure
     
 End Module

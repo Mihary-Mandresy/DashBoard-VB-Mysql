@@ -8,6 +8,8 @@ Public Class Voiture
     Public Property MaxTableau As Decimal
     Public _velocity as Decimal = 0
 
+    Public LastVelocity as Decimal = 0
+
     Public Property Velocity as Decimal
         Get
             Return _velocity

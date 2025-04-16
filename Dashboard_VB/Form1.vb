@@ -10,6 +10,13 @@ Public Class Form1
 
         ' ! Handler
 
+        Private Sub H_ClickReplay(sender As Object, e As EventArgs)
+            replayMode = True
+            input.replayActivate = False
+            Console.WriteLine("Replay mode Active")
+        End Sub
+        
+
         Private Sub H_Select(sender As Object, e As EventArgs)
             Dim cb As ComboBox = CType(sender, ComboBox)
             Dim selected As String = cb.SelectedItem.ToString()
@@ -33,7 +40,7 @@ Public Class Form1
             End If
 
             Select Case e.KeyCode
-                Case Keys.Up
+                Case Keys.A
                     If Not input.k_Acc Then
                         input.k_Acc = True
                         temps = 0
@@ -46,7 +53,7 @@ Public Class Form1
                         End If
                     End If
 
-                Case Keys.Down
+                Case Keys.F
                     If Not input.k_Brake Then 
                         input.k_Brake = True
                         temps = 0
@@ -74,14 +81,14 @@ Public Class Form1
             End If
 
             Select Case e.KeyCode
-                Case Keys.Up
+                Case Keys.A
                     input.k_Acc = False
 
                     Dim now as Date= Date.Now
                     Dim diff As TimeSpan = now - dateInitial
                     Dim secondes As Double = diff.TotalSeconds
                     InsertMouvement(voiture.Velocity, 0, 0, secondes, now, voiture.IdVoiture)
-                Case Keys.Down
+                Case Keys.F
                     input.k_Brake = False
 
                     Dim now as Date= Date.Now
@@ -93,29 +100,118 @@ Public Class Form1
             End Select
         End Sub
 
+            ' ! Dependece H_Timer
+        ' $ Replay
+
+                Private Function IndiceMouvement(seconde as Decimal, listMouvement As List(Of MouvementVoiture)) As Integer
+                    For i As Integer = listMouvement.Count To 1 Step -1
+                        If seconde >= listMouvement(i - 1).Duration Then
+                            Return i - 1
+                        End If
+                    Next
+                    Return  Nothing
+                    ' Throw New Exception("Mbola tsy afaka manao replay")
+                End Function
+
+                Private Sub UpdateReplay(elapsedTime as Decimal, diffSec as Decimal, maxTime as Decimal, listMouvement as List(Of MouvementVoiture))                    
+                    If (elapsedTime >= maxTime) Then
+                        pause = True
+                        Return
+                    End If
+
+                    Dim velocity As Double = 0
+                    Dim lastPhaseTime As Double = 0
+                    Dim lastAcceleration As Double = 0
+                    Dim lastRapport As Double = 0
+                    
+                    ' Parcourt toutes les phases jusqu'au temps écoulé
+
+                    For Each mvt As MouvementVoiture In listMouvement
+                        If mvt.Duration >= elapsedTime Then Exit For
+
+                        Dim phaseDuration As Double = Math.Min(mvt.Duration, elapsedTime) - lastPhaseTime
+                        velocity += phaseDuration * (lastRapport / 10) * lastAcceleration
+                        lastPhaseTime = mvt.Duration
+                        lastAcceleration = mvt.Acceleration
+                        lastRapport = mvt.Rapport
+                    Next
+
+                    input.rapport = lastRapport
+                    
+                    Dim indexMvt As Integer = IndiceMouvement(elapsedTime, listMouvement)
+                    
+                    ' Ajoute la dernière période (entre la dernière phase et le temps actuel)
+                    velocity += lastAcceleration * (lastRapport / 10) * (elapsedTime - lastPhaseTime)
+
+                    Dim averageVelocity As Double = (voiture.LastVelocity + velocity) / 2
+                    distance += averageVelocity * diffSec * 1000 / 3600
+
+                    If Not isNothing(indexMvt) And listMouvement(indexMvt).Acceleration > 0 Then
+                        restReservoir -= diffSec * voiture.Consommation * (lastRapport / 10)
+                    End If
+                    
+                    voiture.LastVelocity = velocity
+                    voiture.Velocity = velocity
+                End Sub
+                
+
+            ' ! End Dependence
+
         Private Sub H_Timer(sender as Object, e as EventArgs)
             Dim now As Date = Date.Now
-            Dim temps_en_milliseconde as Long = GetDiffMIlliSecond(now, lastDate)
-            Dim temps_en_seconde as Decimal = temps_en_milliseconde / 1000
-            Dim tempAcc As Decimal = 0
-            If input.k_Acc Then
-                temps += temps_en_seconde
-                voiture.Velocity += WithRapport(voiture.Acceleration) * temps_en_seconde
-                restReservoir -= temps_en_seconde * WithRapport(voiture.Consommation)
-                tempAcc = voiture.Acceleration()
-            End If
 
-            If  input.k_Brake Then                
-                temps += temps_en_seconde
-                voiture.Velocity -= WithRapport(voiture.Freinage) * temps_en_seconde
+            If replayMode Then
+
+                Dim listMouvement  As List(Of MouvementVoiture) = mouvementService.GetMouvements(connexion, voiture.IdVoiture)
+
+                If Not input.replayActivate Then
+                    temps = 0
+                    dateInitial = now
+                    lastDate = dateInitial
+
+                    voiture.Velocity = 0
+                    restReservoir = voiture.Reservoir
+                    distance = 0
+
+                    input.replayActivate = True
+                End If
+
+                Dim ellapseMillis as Long = GetDiffMIlliSecond(now, dateInitial)
+                Dim ellapsedTime as Decimal = ellapseMillis / 1000
+
+                Dim diffMillis As Long = GetDiffMIlliSecond(now, lastDate)
+                Dim diffSec As Decimal = diffMillis / 1000
+
+
+                UpdateReplay(ellapsedTime, diffSec, listMouvement(listMouvement.Count - 1).Duration,listMouvement)
+                If Not pause Then
+                    temps = ellapsedTime
+                End If
+                
+            Else
+                Dim temps_en_milliseconde as Long = GetDiffMIlliSecond(now, lastDate)
+                Dim temps_en_seconde as Decimal = temps_en_milliseconde / 1000
+                Dim tempAcc As Decimal = 0
+                If input.k_Acc Then
+                    temps += temps_en_seconde
+                    voiture.Velocity += WithRapport(voiture.Acceleration) * temps_en_seconde
+                    restReservoir -= temps_en_seconde * WithRapport(voiture.Consommation)
+                    tempAcc = voiture.Acceleration()
+                End If
+
+                If  input.k_Brake Then                
+                    temps += temps_en_seconde
+                    voiture.Velocity -= WithRapport(voiture.Freinage) * temps_en_seconde
+                End If
+                
+                If Not pause Then
+                    distance += (WithRapport(tempAcc) / 2) * temps_en_seconde * temps_en_seconde + KilometrePerHourToMeterPerSeconde(voiture.Velocity) * temps_en_seconde
+                End If
+
             End If
-            
-            If Not pause Then
-                distance += (WithRapport(tempAcc) / 2) * temps_en_seconde * temps_en_seconde + KilometrePerHourToMeterPerSeconde(voiture.Velocity) * temps_en_seconde
-            End If
-            
-            p_Body.Invalidate()
+                        
             lastDate = now
+            p_Body.Invalidate()
         End Sub
 
         Private Sub H_Paint(sender As Object, e As PaintEventArgs)
@@ -134,7 +230,7 @@ Public Class Form1
             Dim consommation As Decimal = voiture.Reservoir - restReservoir
             Dim enMoyenne As Decimal =  consommation * 100000 / distance
 
-            Console.WriteLine($"Consommation moyenne en 100 km : {enMoyenne} L")
+            Console.WriteLine($"Consommation moyenne en 100 km : {enMoyenne.ToString("F2")} L")
         End Sub
 
 
@@ -246,7 +342,6 @@ Public Class Form1
                 .IdVoiture = id_voiture
             }
             mouvementService.CreateMouvement(connexion, mouvementVoiture)
-
             Console.WriteLine("Insertion termine")
         End Sub
         

@@ -30,7 +30,7 @@ Partial Class Form1
         input.k_Acc = False
         input.k_Brake = False
         input.rapport = 0
-        input.dejaInsert = False
+        input.replayActivate = False
 
         dateInitial = Date.Now
 
@@ -64,13 +64,24 @@ Partial Class Form1
         Next
 
         combobox.SelectedIndex = 0
-
-        ' combobox.
         
         voiture = listVoiture(0)
 
         restReservoir = voiture.Reservoir
         p_header.Controls.Add(combobox)
+
+        ' $ btn replay
+
+        Dim b_replay As New Button() With {
+            .Text = "Replay",
+            .Location = New Point(500, 10),
+            .Size = New Size(200, 40),
+            .Font = New Font("Arial", 20)
+        }
+
+        AddHandler b_replay.Click , AddressOf H_ClickReplay
+        
+        p_header.Controls.Add(b_replay)
 
         ' ! end panel header
 
@@ -95,6 +106,10 @@ Partial Class Form1
         Me.Controls.Add(p_Body)
 
     End Sub
+
+    ' ! Replay mode
+    Private replayMode as Boolean = False
+    ' ! <== End Replay ==>
 
     Private dateInitial as Date
 

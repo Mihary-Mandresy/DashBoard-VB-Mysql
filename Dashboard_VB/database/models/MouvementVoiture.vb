@@ -6,4 +6,8 @@ Public Class MouvementVoiture
     Public Property Duration As Decimal
     Public Property Daty As DateTime
     Public Property IdVoiture As Integer
+
+    Public Overrides Function ToString() As String
+        Return $"v : {VitesseInitial}, a : {Acceleration}, r : {Rapport}, duration : {Duration}, D : {Daty}, Idvoiture: {IdVoiture} "
+    End Function
 End Class
